@@ -65,13 +65,18 @@ func (pe *Pinentry) ConfirmPresence(prompt string, challengeParam, applicationPa
 }
 
 func (pe *Pinentry) prompt(req *request, prompt string) {
-
 	sendResult := func(r Result) {
+		select {
+		case req.pendingResult <- r:
+		case <-time.After(req.timeout):
+			// we expect requests to come in every ~750ms.
+			// If we've been waiting for 2 seconds the client
+			// is likely gone.
+		}
+
 		pe.mu.Lock()
 		pe.activeRequest = nil
 		pe.mu.Unlock()
-
-		req.pendingResult <- r
 	}
 
 	childCtx, cancel := context.WithCancel(context.Background())
