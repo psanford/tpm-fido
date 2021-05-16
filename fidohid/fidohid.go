@@ -112,8 +112,6 @@ func (t *SoftToken) Run(ctx context.Context) {
 
 			resp := newInitResponse(chanID, nonce)
 
-			log.Printf("send resp: %+v\n", resp)
-
 			err := writeRespose(t.device, reqChanID, CmdInit, resp.Marshal(), 0)
 			if err != nil {
 				log.Printf("Write Init resp err: %s", err)
@@ -129,17 +127,13 @@ func (t *SoftToken) Run(ctx context.Context) {
 				Error:  err,
 			}
 
-			// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-			log.Printf("write to AuthEvent chan")
-			defer log.Printf("done write to AuthEvent chan")
-
 			select {
 			case t.authEvent <- evt:
 			case <-ctx.Done():
 				return
 			}
 		default:
-			log.Printf("send Cmd not supported err")
+			log.Printf("unsuppoted cmd: %s %d", cmd, cmd)
 			writeRespose(t.device, reqChanID, cmd, nil, swInsNotSupported)
 		}
 	}
@@ -464,8 +458,6 @@ func writeRespose(d *uhid.Device, chanID uint32, cmd CmdType, data []byte, statu
 
 	initial := true
 	pktSize := initialPacketDataLen
-
-	log.Printf("writeRespose chan: %d cmd: %s, status: %d", chanID, cmd, status)
 
 	if status > 0 {
 		statusBytes := make([]byte, 2)

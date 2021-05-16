@@ -3,7 +3,6 @@ package fidoauth
 
 import (
 	"fmt"
-	"log"
 )
 
 const (
@@ -58,8 +57,6 @@ func DecodeAuthenticatorRequest(raw []byte) (*AuthenticatorRequest, error) {
 		Size:    (int(raw[4]) << 16) | (int(raw[5]) << 8) | int(raw[6]),
 		Data:    raw[7:],
 	}
-
-	log.Printf("got authenticatorrequest data: %+v", req.Data)
 
 	if req.Command == CmdRegister {
 		var reg AuthenticatorRegisterReq

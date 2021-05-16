@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"flag"
 	"log"
 	"math/big"
 	"time"
@@ -15,37 +16,52 @@ import (
 	"github.com/psanford/tpm-fido/attestation"
 	"github.com/psanford/tpm-fido/fidoauth"
 	"github.com/psanford/tpm-fido/fidohid"
+	"github.com/psanford/tpm-fido/memory"
 	"github.com/psanford/tpm-fido/pinentry"
 	"github.com/psanford/tpm-fido/statuscode"
-	"golang.org/x/crypto/chacha20poly1305"
+	"github.com/psanford/tpm-fido/tpm"
 )
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-var (
-	masterPrivateKey []byte
-	signCounter      uint32
-)
+var backend = flag.String("backend", "tpm", "tpm|memory")
 
 func main() {
-
+	flag.Parse()
 	s := newServer()
 	s.run()
 }
 
 type server struct {
-	pe *pinentry.Pinentry
+	pe     *pinentry.Pinentry
+	signer Signer
+}
+
+type Signer interface {
+	RegisterKey(applicationParam []byte) ([]byte, *big.Int, *big.Int, error)
+	SignASN1(keyHandle, applicationParam, digest []byte) ([]byte, error)
+	Counter() uint32
 }
 
 func newServer() *server {
-	return &server{
+	s := server{
 		pe: pinentry.New(),
 	}
+	if *backend == "tpm" {
+		signer, err := tpm.New()
+		if err != nil {
+			panic(err)
+		}
+		s.signer = signer
+	} else if *backend == "memory" {
+		signer, err := memory.New()
+		if err != nil {
+			panic(err)
+		}
+		s.signer = signer
+	}
+	return &s
 }
 
 func (s *server) run() {
-
-	masterPrivateKey = mustRand(chacha20poly1305.KeySize)
-
 	ctx := context.Background()
 	token, err := fidohid.New(ctx, "tpm-fido")
 	if err != nil {
@@ -63,14 +79,12 @@ func (s *server) run() {
 		req := evt.Req
 
 		if req.Command == fidoauth.CmdAuthenticate {
-			log.Printf("got AuthenticatorAuthenticateCmd req")
-			log.Printf("req: %+v", req.Authenticate)
+			log.Print("got AuthenticateCmd")
 
 			s.handleAuthenticate(ctx, token, evt)
 		} else if req.Command == fidoauth.CmdRegister {
-			log.Printf("got AuthenticatorRegisterCmd req: %+v", req)
+			log.Print("got RegisterCmd")
 			s.handleRegister(ctx, token, evt)
-			log.Printf("done handleRegister: %+v", req)
 		} else {
 			log.Printf("unsupported request type: 0x%02x\n", req.Command)
 			// send a not supported error for any commands that we don't understand.
@@ -84,26 +98,14 @@ func (s *server) run() {
 func (s *server) handleAuthenticate(parentCtx context.Context, token *fidohid.SoftToken, evt fidohid.AuthEvent) {
 	req := evt.Req
 
-	aead, err := chacha20poly1305.NewX(masterPrivateKey)
+	keyHandle := req.Authenticate.KeyHandle
+	appParam := req.Authenticate.ApplicationParam[:]
+
+	dummySig := sha256.Sum256([]byte("meticulously-Bacardi"))
+
+	_, err := s.signer.SignASN1(keyHandle, appParam, dummySig[:])
 	if err != nil {
-		panic(err)
-	}
-
-	if len(req.Authenticate.KeyHandle) < chacha20poly1305.NonceSizeX {
-		log.Fatalf("incorrect size for key handle: %d smaller than nonce)", len(req.Authenticate.KeyHandle))
-	}
-	nonce := req.Authenticate.KeyHandle[:chacha20poly1305.NonceSizeX]
-	cipherText := req.Authenticate.KeyHandle[chacha20poly1305.NonceSizeX:]
-
-	metadata := []byte("fido_wrapping_key")
-	metadata = append(metadata, req.Authenticate.ApplicationParam[:]...)
-	h := sha256.New()
-	h.Write(metadata)
-	sum := h.Sum(nil)
-
-	childPrivateKey, err := aead.Open(nil, nonce, cipherText, sum)
-	if err != nil {
-		log.Printf("decrypt key handle failed")
+		log.Printf("invalid key: %s (key handle size: %d)", err, len(keyHandle))
 
 		err := token.WriteResponse(parentCtx, evt, nil, statuscode.WrongData)
 		if err != nil {
@@ -181,7 +183,7 @@ func (s *server) handleAuthenticate(parentCtx context.Context, token *fidohid.So
 		}
 	}
 
-	signCounter++
+	signCounter := s.signer.Counter()
 
 	var toSign bytes.Buffer
 	toSign.Write(req.Authenticate.ApplicationParam[:])
@@ -192,13 +194,7 @@ func (s *server) handleAuthenticate(parentCtx context.Context, token *fidohid.So
 	sigHash := sha256.New()
 	sigHash.Write(toSign.Bytes())
 
-	var ecdsaKey ecdsa.PrivateKey
-
-	ecdsaKey.D = new(big.Int).SetBytes(childPrivateKey)
-	ecdsaKey.PublicKey.Curve = elliptic.P256()
-	ecdsaKey.PublicKey.X, ecdsaKey.PublicKey.Y = ecdsaKey.PublicKey.Curve.ScalarBaseMult(ecdsaKey.D.Bytes())
-
-	sig, err := ecdsa.SignASN1(rand.Reader, &ecdsaKey, sigHash.Sum(nil))
+	sig, err := s.signer.SignASN1(keyHandle, appParam, sigHash.Sum(nil))
 	if err != nil {
 		log.Fatalf("auth sign err: %s", err)
 	}
@@ -220,7 +216,6 @@ func (s *server) handleRegister(parentCtx context.Context, token *fidohid.SoftTo
 	defer cancel()
 	req := evt.Req
 
-	log.Printf("register start pin entry")
 	pinResultCh, err := s.pe.ConfirmPresence("FIDO Confirm Register", req.Register.ChallengeParam, req.Register.ApplicationParam)
 
 	if err != nil {
@@ -237,8 +232,6 @@ func (s *server) handleRegister(parentCtx context.Context, token *fidohid.SoftTo
 				log.Printf("Got pinentry result err: %s", result.Error)
 			}
 
-			log.Printf("pinentry got not ok")
-
 			// Got user cancelation, we want to propagate that so the browser gives up.
 			// This isn't normally supported by a key so there's no status code for this.
 			// WrongData seems like the least incorrect status code ¯\_(ツ)_/¯
@@ -250,11 +243,9 @@ func (s *server) handleRegister(parentCtx context.Context, token *fidohid.SoftTo
 			return
 		}
 
-		registerSite(parentCtx, token, evt)
+		s.registerSite(parentCtx, token, evt)
 	case <-ctx.Done():
-		log.Printf("register: short token timeout")
 		err := token.WriteResponse(ctx, evt, nil, statuscode.ConditionsNotSatisfied)
-		log.Printf("done WriteResponse statuscode.ConditionsNotSatisfied")
 		if err != nil {
 			log.Printf("Write swConditionsNotSatisfied resp err: %s", err)
 			return
@@ -262,39 +253,16 @@ func (s *server) handleRegister(parentCtx context.Context, token *fidohid.SoftTo
 	}
 }
 
-func registerSite(ctx context.Context, token *fidohid.SoftToken, evt fidohid.AuthEvent) {
+func (s *server) registerSite(ctx context.Context, token *fidohid.SoftToken, evt fidohid.AuthEvent) {
 	req := evt.Req
 
-	curve := elliptic.P256()
-
-	childPrivateKey, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	keyHandle, x, y, err := s.signer.RegisterKey(req.Register.ApplicationParam[:])
 	if err != nil {
-		panic(err)
+		log.Printf("RegisteKey err: %s", err)
+		return
 	}
 
-	metadata := []byte("fido_wrapping_key")
-	metadata = append(metadata, req.Register.ApplicationParam[:]...)
-	h := sha256.New()
-	h.Write(metadata)
-	sum := h.Sum(nil)
-
-	aead, err := chacha20poly1305.NewX(masterPrivateKey)
-	if err != nil {
-		panic(err)
-	}
-
-	nonce := mustRand(chacha20poly1305.NonceSizeX)
-	encryptedChildPrivateKey := aead.Seal(nil, nonce, childPrivateKey, sum)
-
-	keyHandle := make([]byte, 0, len(nonce)+len(encryptedChildPrivateKey))
-	keyHandle = append(keyHandle, nonce...)
-	keyHandle = append(keyHandle, encryptedChildPrivateKey...)
-
-	if len(keyHandle) > 255 {
-		panic("keyHandle is too big")
-	}
-
-	childPubKey := elliptic.Marshal(curve, x, y)
+	childPubKey := elliptic.Marshal(elliptic.P256(), x, y)
 
 	var toSign bytes.Buffer
 	toSign.WriteByte(0)
@@ -325,7 +293,6 @@ func registerSite(ctx context.Context, token *fidohid.SoftToken, evt fidohid.Aut
 		log.Printf("write register response err: %s", err)
 		return
 	}
-
 }
 
 func mustRand(size int) []byte {
