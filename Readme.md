@@ -25,7 +25,7 @@ go build
 
 ## Running
 
-In order to run `tpm-fido` you will need permission to access `/dev/tpm0`. On Ubuntu systems, users with the group `plugdev` will have access to the TPM.
+In order to run `tpm-fido` you will need permission to access `/dev/tpm0`.
 
 ```
 # as a user that has permission to read and write to /dev/tpm0:
