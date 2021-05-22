@@ -81,7 +81,7 @@ func (pe *Pinentry) prompt(req *request, prompt string) {
 
 	childCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p, err := launchPinEntry(childCtx)
+	p, cmd, err := launchPinEntry(childCtx)
 	if err != nil {
 		sendResult(Result{
 			OK:    false,
@@ -89,6 +89,10 @@ func (pe *Pinentry) prompt(req *request, prompt string) {
 		})
 		return
 	}
+	defer func() {
+		cancel()
+		cmd.Wait()
+	}()
 
 	defer p.Shutdown()
 	p.SetTitle("TPM-FIDO")
@@ -126,14 +130,30 @@ func (pe *Pinentry) prompt(req *request, prompt string) {
 	}
 }
 
-func launchPinEntry(ctx context.Context) (*pinentry.Client, error) {
+func launchPinEntry(ctx context.Context) (*pinentry.Client, *exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, "pinentry")
 
-	var c pinentry.Client
-	var err error
-	c.Session, err = assuan.InitCmd(cmd)
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &c, nil
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, nil, err
+	}
+
+	var c pinentry.Client
+	c.Session, err = assuan.Init(assuan.ReadWriteCloser{
+		ReadCloser:  stdout,
+		WriteCloser: stdin,
+	})
+
+	if err != nil {
+		return nil, nil, err
+	}
+	return &c, cmd, nil
 }
