@@ -46,7 +46,14 @@ func (pe *Pinentry) ConfirmPresence(prompt string, challengeParam, applicationPa
 			return nil, errors.New("other request already in progress")
 		}
 
-		pe.activeRequest.extendTimeout <- timeout
+		extendTimeoutChan := pe.activeRequest.extendTimeout
+
+		go func() {
+			select {
+			case extendTimeoutChan <- timeout:
+			case <-time.After(timeout):
+			}
+		}()
 
 		return pe.activeRequest.pendingResult, nil
 	}
