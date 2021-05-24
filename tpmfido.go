@@ -85,6 +85,9 @@ func (s *server) run() {
 		} else if req.Command == fidoauth.CmdRegister {
 			log.Print("got RegisterCmd")
 			s.handleRegister(ctx, token, evt)
+		} else if req.Command == fidoauth.CmdVersion {
+			log.Print("got VersionCmd")
+			s.handleVersion(ctx, token, evt)
 		} else {
 			log.Printf("unsupported request type: 0x%02x\n", req.Command)
 			// send a not supported error for any commands that we don't understand.
@@ -93,6 +96,10 @@ func (s *server) run() {
 			token.WriteResponse(ctx, evt, nil, statuscode.ClaNotSupported)
 		}
 	}
+}
+
+func (s *server) handleVersion(parentCtx context.Context, token *fidohid.SoftToken, evt fidohid.AuthEvent) {
+	token.WriteResponse(parentCtx, evt, []byte("U2F_V2"), statuscode.NoError)
 }
 
 func (s *server) handleAuthenticate(parentCtx context.Context, token *fidohid.SoftToken, evt fidohid.AuthEvent) {
