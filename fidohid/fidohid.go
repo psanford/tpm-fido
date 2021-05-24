@@ -434,7 +434,7 @@ func newInitResponse(channelID uint32, nonce [8]byte) *initResponse {
 		MajorDeviceVersion: deviceMajor,
 		MinorDeviceVersion: deviceMinor,
 		BuildDeviceVersion: deviceBuild,
-		RawCapabilities:    winkCapability,
+		// RawCapabilities:    winkCapability,
 	}
 }
 
