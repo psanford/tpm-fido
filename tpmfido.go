@@ -281,7 +281,9 @@ func (s *server) registerSite(ctx context.Context, token *fidohid.SoftToken, evt
 	sigHash := sha256.New()
 	sigHash.Write(toSign.Bytes())
 
-	sigR, sigS, err := ecdsa.Sign(rand.Reader, attestation.PrivateKey, sigHash.Sum(nil))
+	sum := sigHash.Sum(nil)
+
+	sig, err := ecdsa.SignASN1(rand.Reader, attestation.PrivateKey, sum)
 	if err != nil {
 		log.Fatalf("attestation sign err: %s", err)
 	}
@@ -292,7 +294,6 @@ func (s *server) registerSite(ctx context.Context, token *fidohid.SoftToken, evt
 	out.WriteByte(byte(len(keyHandle)))
 	out.Write(keyHandle)
 	out.Write(attestation.CertDer)
-	sig := elliptic.Marshal(elliptic.P256(), sigR, sigS)
 	out.Write(sig)
 
 	err = token.WriteResponse(ctx, evt, out.Bytes(), statuscode.NoError)
