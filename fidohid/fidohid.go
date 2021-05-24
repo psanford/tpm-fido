@@ -169,7 +169,9 @@ const (
 	deviceMinor        = 0
 	deviceBuild        = 0
 	winkCapability     = 0x01
+	lockCapability     = 0x02
 	cborCapability     = 0x04
+	nmsgCapability     = 0x08
 
 	swInsNotSupported = 0x6D00 // The Instruction of the request is not supported
 )
@@ -245,7 +247,6 @@ func parsePackets(ctx context.Context, evtChan chan uhid.Event, pktChan chan Pac
 		if evt.Err != nil {
 			log.Fatalf("got evt err: %s", evt.Err)
 		}
-		// log.Printf("data: (%d) %+v", len(evt.Data), evt.Data)
 
 		// Output means the kernel has sent us data
 		if evt.Type == uhid.Output {
@@ -263,6 +264,7 @@ func parsePackets(ctx context.Context, evtChan chan uhid.Event, pktChan chan Pac
 				continue
 			}
 			typeOrSeqNo := b1[0]
+
 			if typeOrSeqNo&frameTypeInit == frameTypeInit {
 				typ := typeOrSeqNo
 				cmd := typ ^ frameTypeInit
@@ -387,8 +389,8 @@ func (fi *frameInit) Marshal() []byte {
 	buf.WriteByte(fi.Command)
 	binary.Write(buf, binary.BigEndian, fi.TotalPayloadLen)
 	buf.Write(fi.Data)
-	if buf.Len() < initialPacketDataLen {
-		pad := make([]byte, initialPacketDataLen-buf.Len())
+	if len(fi.Data) < initialPacketDataLen {
+		pad := make([]byte, initialPacketDataLen-len(fi.Data))
 		buf.Write(pad)
 	}
 
@@ -406,8 +408,9 @@ func (fi *frameCont) Marshal() []byte {
 	binary.Write(buf, binary.BigEndian, fi.ChannelID)
 	buf.WriteByte(fi.SeqNo)
 	buf.Write(fi.Data)
-	if buf.Len() < contPacketDataLen {
-		pad := make([]byte, contPacketDataLen-buf.Len())
+	if len(fi.Data) < contPacketDataLen {
+		pad := make([]byte, contPacketDataLen-len(fi.Data))
+
 		buf.Write(pad)
 	}
 	return buf.Bytes()
@@ -431,7 +434,7 @@ func newInitResponse(channelID uint32, nonce [8]byte) *initResponse {
 		MajorDeviceVersion: deviceMajor,
 		MinorDeviceVersion: deviceMinor,
 		BuildDeviceVersion: deviceBuild,
-		// RawCapabilities:    winkCapability | cborCapability,
+		RawCapabilities:    winkCapability,
 	}
 }
 
