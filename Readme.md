@@ -14,7 +14,7 @@ On an authentication request, tpm-fido will attempt to load the primary key by i
 
 ## Status
 
-tpm-fido has been tested to work with Chrome on Linux. It does not currently work with Firefox, but we do plan on supporting Firefox in the future.
+tpm-fido has been tested to work with Chrome and Firefox on Linux.
 
 ## Building
 
