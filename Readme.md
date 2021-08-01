@@ -25,10 +25,19 @@ go build
 
 ## Running
 
-In order to run `tpm-fido` you will need permission to access `/dev/tpm0`.
+In order to run `tpm-fido` you will need permission to access `/dev/tpmrm0`. On Ubuntu, you can add your user to the `tss` group.
+
+Your user also needs permission to access `/dev/uhid` so that `tpm-fido` can appear to be a USB device.
+I use the following udev rule to set the appropriate `uhid` permissions:
 
 ```
-# as a user that has permission to read and write to /dev/tpm0:
+KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO", MODE="0660"
+```
+
+To run:
+
+```
+# as a user that has permission to read and write to /dev/tpmrm0:
 ./tpm-fido
 ```
 
