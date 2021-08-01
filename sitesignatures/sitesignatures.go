@@ -28,6 +28,7 @@ var reverseSignatures = map[[32]byte]string{
 	hashURL("bin.coffee"):          "bin.coffee",
 	hashURL("coinbase.com"):        "coinbase.com",
 	hashURL("demo.yubico.com"):     "demo.yubico.com",
+	hashURL("github.com"):          "github.com",
 	hashURL("webauthn.bin.coffee"): "webauthn.bin.coffee",
 	hashURL("webauthn.io"):         "webauthn.io",
 }
