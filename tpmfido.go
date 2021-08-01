@@ -23,6 +23,7 @@ import (
 )
 
 var backend = flag.String("backend", "tpm", "tpm|memory")
+var device = flag.String("device", "/dev/tpmrm0", "TPM device path")
 
 func main() {
 	flag.Parse()
@@ -46,7 +47,7 @@ func newServer() *server {
 		pe: pinentry.New(),
 	}
 	if *backend == "tpm" {
-		signer, err := tpm.New()
+		signer, err := tpm.New(*device)
 		if err != nil {
 			panic(err)
 		}

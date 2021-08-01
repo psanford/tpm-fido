@@ -23,15 +23,18 @@ var (
 )
 
 type TPM struct {
-	mu sync.Mutex
+	devicePath string
+	mu         sync.Mutex
 }
 
 func (t *TPM) open() (io.ReadWriteCloser, error) {
-	return tpm2.OpenTPM("/dev/tpm0")
+	return tpm2.OpenTPM(t.devicePath)
 }
 
-func New() (*TPM, error) {
-	t := &TPM{}
+func New(devicePath string) (*TPM, error) {
+	t := &TPM{
+		devicePath: devicePath,
+	}
 
 	tpm, err := t.open()
 	if err != nil {
