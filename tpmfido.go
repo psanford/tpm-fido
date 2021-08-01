@@ -18,6 +18,7 @@ import (
 	"github.com/psanford/tpm-fido/fidohid"
 	"github.com/psanford/tpm-fido/memory"
 	"github.com/psanford/tpm-fido/pinentry"
+	"github.com/psanford/tpm-fido/sitesignatures"
 	"github.com/psanford/tpm-fido/statuscode"
 	"github.com/psanford/tpm-fido/tpm"
 )
@@ -80,11 +81,11 @@ func (s *server) run() {
 		req := evt.Req
 
 		if req.Command == fidoauth.CmdAuthenticate {
-			log.Print("got AuthenticateCmd")
+			log.Printf("got AuthenticateCmd site=%s", sitesignatures.FromAppParam(req.Authenticate.ApplicationParam))
 
 			s.handleAuthenticate(ctx, token, evt)
 		} else if req.Command == fidoauth.CmdRegister {
-			log.Print("got RegisterCmd")
+			log.Printf("got RegisterCmd site=%s", sitesignatures.FromAppParam(req.Register.ApplicationParam))
 			s.handleRegister(ctx, token, evt)
 		} else if req.Command == fidoauth.CmdVersion {
 			log.Print("got VersionCmd")
