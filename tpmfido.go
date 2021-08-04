@@ -271,6 +271,11 @@ func (s *server) registerSite(ctx context.Context, token *fidohid.SoftToken, evt
 		return
 	}
 
+	if len(keyHandle) > 255 {
+		log.Printf("Error: keyHandle too large: %d, max=255", len(keyHandle))
+		return
+	}
+
 	childPubKey := elliptic.Marshal(elliptic.P256(), x, y)
 
 	var toSign bytes.Buffer
