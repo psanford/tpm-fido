@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/google/go-tpm/tpm2"
-	"github.com/psanford/lencode"
+	"github.com/psanford/tpm-fido/internal/lencode"
 	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/cryptobyte/asn1"
 	"golang.org/x/crypto/hkdf"
 )
 
 var (
-	separator     = []byte("TPMFIDO")
-	seedSizeBytes = 32
+	separator     = []byte("TPM")
+	seedSizeBytes = 20
 )
 
 type TPM struct {
