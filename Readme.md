@@ -34,6 +34,8 @@ I use the following udev rule to set the appropriate `uhid` permissions:
 KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO", MODE="0660"
 ```
 
+To ensure the above udev rule gets triggered, I also add the `uhid` module to `/etc/modules-load.d/uhid.conf` so that it loads at boot.
+
 To run:
 
 ```
