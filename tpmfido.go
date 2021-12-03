@@ -9,8 +9,12 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"flag"
+	"fmt"
 	"log"
 	"math/big"
+	"os"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/psanford/tpm-fido/attestation"
@@ -25,9 +29,41 @@ import (
 
 var backend = flag.String("backend", "tpm", "tpm|memory")
 var device = flag.String("device", "/dev/tpmrm0", "TPM device path")
+var daemon = flag.Bool("daemon", false, "Run tpm-fido as a daemon")
+
+const pidFile = "/run/user/%d/tpm-fido.pid"
 
 func main() {
 	flag.Parse()
+	if *daemon {
+		// If process exists and is running, don't start a new one
+		formatted := fmt.Sprintf(pidFile, os.Getuid())
+		// Checking for the existence of the pid file
+		if _, err := os.Stat(formatted); err == nil {
+			var pid int
+			file, err := os.Open(formatted)
+			if err != nil {
+				log.Fatalf("Could not open pid file: %s", err)
+			}
+			_, err = fmt.Fscanf(file, "%d", &pid)
+			if err != nil {
+				log.Fatalf("Could not read pid file: %s", err)
+			}
+			process, err := os.FindProcess(pid)
+			if err != nil {
+				log.Fatalf("Could not find process: %s", err)
+			}
+			// If process is running, process.Signal(syscall.Signal(0)) will return nil
+			err = process.Signal(syscall.Signal(0))
+			if err == nil {
+				fmt.Printf("Already running and %s file exists.\n", formatted)
+				os.Exit(1)
+			} else {
+				fmt.Printf("%s file exists, but the process seems dead. Running daemon.\n", formatted)
+			}
+		}
+		savePID(formatted, os.Getpid())
+	}
 	s := newServer()
 	s.run()
 }
@@ -317,4 +353,24 @@ func mustRand(size int) []byte {
 	}
 
 	return b
+}
+
+func savePID(filename string, pid int) {
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Printf("Unable to create pid file : %v\n", err)
+		os.Exit(1)
+	}
+
+	defer file.Close()
+
+	_, err = file.WriteString(strconv.Itoa(pid))
+
+	if err != nil {
+		log.Printf("Unable to create pid file : %v\n", err)
+		os.Exit(1)
+	}
+
+	file.Sync() // flush to disk
+
 }
