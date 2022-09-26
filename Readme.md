@@ -58,6 +58,8 @@ Description=TPM FIDO
 Type=simple
 ExecStart=/usr/local/bin/tpm-fido
 Restart=on-failure
+Slice=session.slice
+Environment=DISPLAY=:0.0
 
 [Install]
 WantedBy=basic.target
