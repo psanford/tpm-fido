@@ -65,6 +65,11 @@ func newServer() *server {
 
 func (s *server) run() {
 	ctx := context.Background()
+
+	if pinentry.FindPinentryGUIPath() == "" {
+		log.Printf("warning: no gui pinentry binary detected in PATH. tpm-fido may not work correctly without a gui based pinentry")
+	}
+
 	token, err := fidohid.New(ctx, "tpm-fido")
 	if err != nil {
 		log.Fatalf("create fido hid error: %s", err)

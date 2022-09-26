@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os/exec"
 	"sync"
 	"time"
@@ -137,8 +138,32 @@ func (pe *Pinentry) prompt(req *request, prompt string) {
 	}
 }
 
+func FindPinentryGUIPath() string {
+	candidates := []string{
+		"pinentry-gnome3",
+		"pinentry-qt5",
+		"pinentry-qt4",
+		"pinentry-qt",
+		"pinentry-gtk-2",
+		"pinentry-x11",
+		"pinentry-fltk",
+	}
+	for _, candidate := range candidates {
+		p, _ := exec.LookPath(candidate)
+		if p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
 func launchPinEntry(ctx context.Context) (*pinentry.Client, *exec.Cmd, error) {
-	cmd := exec.CommandContext(ctx, "pinentry")
+	pinEntryCmd := FindPinentryGUIPath()
+	if pinEntryCmd == "" {
+		log.Printf("Failed to detect gui pinentry binary. Falling back to default `pinentry`")
+		pinEntryCmd = "pinentry"
+	}
+	cmd := exec.CommandContext(ctx, pinEntryCmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
