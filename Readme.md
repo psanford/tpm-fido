@@ -31,7 +31,7 @@ Your user also needs permission to access `/dev/uhid` so that `tpm-fido` can app
 I use the following udev rule to set the appropriate `uhid` permissions:
 
 ```
-KERNEL=="tpmrm[0-9]*", MODE="066", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO"
+KERNEL=="tpmrm[0-9]*", MODE="0660", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO"
 KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO", MODE="0660"
 ```
 
