@@ -60,11 +60,11 @@ func (t *SoftToken) Events() chan AuthEvent {
 func (t *SoftToken) Run(ctx context.Context) {
 	channels := make(map[uint32]bool)
 	allocateChan := func() (uint32, bool) {
-		for k := 1; k < (1<<32)-1; k++ {
-			inUse := channels[uint32(k)]
+		for k := uint32(1); k < (1<<32)-1; k++ {
+			inUse := channels[k]
 			if !inUse {
-				channels[uint32(k)] = true
-				return uint32(k), true
+				channels[k] = true
+				return k, true
 			}
 		}
 		return 0, false
