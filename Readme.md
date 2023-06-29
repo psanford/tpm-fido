@@ -31,6 +31,7 @@ Your user also needs permission to access `/dev/uhid` so that `tpm-fido` can app
 I use the following udev rule to set the appropriate `uhid` permissions:
 
 ```
+KERNEL=="tpmrm[0-9]*", MODE="0660", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO"
 KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="SOME_UHID_GROUP_MY_USER_BELONGS_TO", MODE="0660"
 ```
 
@@ -43,6 +44,30 @@ To run:
 ./tpm-fido
 ```
 Note: do not run with `sudo` or as root, as it will not work.
+
+## Setup as systemd service
+
+Install `tpm-fido` eg. to `/usr/local/bin/tpm-fido`.
+
+Write to `/etc/systemd/user/tpm-fido.service`:
+```
+[Unit]
+Description=TPM FIDO
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tpm-fido
+Restart=on-failure
+Slice=session.slice
+Environment=DISPLAY=:0.0
+
+[Install]
+WantedBy=basic.target
+```
+
+```
+systemctl --user enable --now tpm-fido.service
+```
 
 ## Dependencies
 
