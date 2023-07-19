@@ -44,6 +44,37 @@ To run:
 ```
 Note: do not run with `sudo` or as root, as it will not work.
 
+
+To run it at boot:
+
+Create a file in `/etc/systemd/user/tpm-fido.service`
+
+```toml
+[Unit]
+Description=FIDO Implementation using TPM
+
+[Service]
+Type=simple
+#User=
+#Group=
+ExecStart=/usr/bin/tpm-fido
+Restart=on-failure
+StandardOutput=file:%h/.tpm-fido/output.log
+
+[Install]
+WantedBy=default.target
+```
+
+Enable the service:
+```bash
+mkdir $HOME/.tpm-fido/output.log
+systemctl --user daemon-reload
+systemctl --user enable --now tpm-fido
+```
+
+Look into  `~/.tpm-fido/output.log` to see the log.
+
+
 ## Dependencies
 
 tpm-fido requires `pinentry` to be available on the system. If you have gpg installed you most likely already have `pinentry`.
